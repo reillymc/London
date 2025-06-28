@@ -14,6 +14,11 @@ production stylesheet in assets/built/screen.css using gulp dev
 /* Main - Theme styles
 /* ---------------------------------------------------------- */
 
+body {
+    color: var(--color-primary-text);
+    background-color: var(--color-background);
+}
+
 .img {
     display: block;
     width: 100%;
@@ -99,6 +104,9 @@ production stylesheet in assets/built/screen.css using gulp dev
 
 /* Site Navigation
 /* ---------------------------------------------------------- */
+.gh-head {
+    background-color: var(--color-background);
+}
 
 .gh-head-logo {
     font-size: 2.1rem;
@@ -351,4 +359,10 @@ production stylesheet in assets/built/screen.css using gulp dev
 .author-links .divider {
     display: inline-block;
     margin: 0 3px;
+}
+
+/* Misc Elements
+/* ---------------------------------------------------------- */
+.gh-content a {
+    color: var(--color-primary-text);
 }

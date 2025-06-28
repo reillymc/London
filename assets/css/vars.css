@@ -28,4 +28,17 @@
     --margin: 2rem;
     --radius: 0.5rem;
     --header-spacing: max(6vw, 64px);
+
+    --color-background: var(--color-white);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-base: #fff;
+        --color-background: #131313;
+        --color-primary-text: #fff;
+        --color-secondary-text: #ccc;
+
+        --color-darker-gray: #e3e5e8;
+    }
 }
