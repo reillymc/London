@@ -14,6 +14,15 @@
 
     <div class="post-content-body gh-content gh-canvas">
         {{content}}
+        <div class="post-content-footer">
+            {{#prev_post}}
+                <a href="{{url}}">< {{title}}</a>
+            {{/prev_post}}
+
+            {{#next_post}}
+                <a href="{{url}}">{{title}} ></a>
+            {{/next_post}}
+        </div>
     </div>
 
     {{#if comments}}

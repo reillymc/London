@@ -308,6 +308,13 @@ production stylesheet in assets/built/screen.css using gulp dev
     }
 }
 
+.post-content-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    grid-column: wide;
+}
+
 .post-content-comments {
     margin-top: 64px;
 }
