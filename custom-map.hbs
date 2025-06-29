@@ -1,0 +1,123 @@
+{{!< default}}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+
+{{#post}}
+<article class="post-content {{post_class}}">
+
+    {{#match @page.show_title_and_feature_image}}
+        <header class="post-content-header gh-canvas">
+            <h1 class="post-content-title">{{title}}</h1>
+            {{> "feature-image"}}
+        </header>
+    {{/match}}
+
+    <div class="post-content-body gh-content gh-canvas">
+        {{content}}
+    </div>
+
+</article>
+{{/post}}
+
+<div id="post-list" style="display: none;">
+    {{#get "posts" limit="all" include="excerpt,tags"}}
+        {{#foreach posts}}
+            <div id="post-item">
+                <div id="post-item-title">
+                    {{title}}
+                <div id="post-item-date">
+                    {{date format='YYYY-MM-DD'}}
+                </div>
+                </div>
+                <div id="post-item-excerpt">
+                    {{excerpt}}
+                </div>
+                <div id="post-item-tags">
+                    {{tags visibility="internal" autolink="false"}}
+                </div>
+            </div>
+        {{/foreach}}
+    {{/get}}
+</div>
+
+<script>
+    const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    })
+
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change',({ matches }) => {
+  if (matches) {
+    tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png")
+  } else {
+    tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png")
+  }
+})
+
+    const locationRegex = /\[(.*?)\]/g;
+
+    // TODO: Link to post in popup.
+    const postLocations = Array.from(document.getElementById("post-list")?.children ?? []).map(child => {
+        const title = child.querySelector("#post-item-title")?.textContent?.trim();
+        const date = child.querySelector("#post-item-date")?.textContent?.trim();
+        const location = child.querySelector("#post-item-excerpt")?.textContent?.match(locationRegex)?.[0]?.replace("[", "")?.replace("]", "")?.split(",");
+        const tripId = child.querySelector("#post-item-tags").childNodes[0].textContent.trim().split(", ").filter(tag => tag.startsWith("#Trip-"))
+        
+        if (location?.length !== 2 || !title || !tripId || !date) {
+            console.debug(`${title ?? "Untitled"} has incomplete metadata`);
+            return;
+        }
+
+        return {
+            title,
+            date: new Date(date).getTime(),
+            latitude: Number.parseFloat(location[0]),
+            longitude: Number.parseFloat(location[1]),
+            tripId
+        };
+    }).filter(post => !!post)
+
+    var map = L.map('map');
+    
+    tileLayer.addTo(map);
+
+    postLocations.forEach(postLocation => {
+        var marker = L.marker([postLocation.latitude, postLocation.longitude]).addTo(map);
+        marker.bindPopup(`<h2>${postLocation.title}</h2>`);
+    })
+
+    const tripLineLocations = postLocations.reduce((acc, postLocation) => {
+        return {
+            ...acc,
+            [postLocation.tripId]: {
+                ...acc[postLocation.tripId ?? {}],
+                postLocations: [...acc[postLocation.tripId]?.postLocations ?? [], postLocation],
+                lastStopDate: acc[postLocation.tripId]?.lastStopDate > postLocation.date ? acc[postLocation.tripId]?.lastStopDate : postLocation.date
+            }
+        }
+    },{})
+
+    let polyline;
+
+    Object.entries(tripLineLocations).sort(([_tripAId, tripA], [_tripBId, tripB]) => tripA.lastStopDate > tripB.lastStopDate).forEach(([tripId, trip]) => {
+        const latlngs = trip.postLocations.map(({latitude, longitude}) => [latitude, longitude]) ;
+
+        polyline = L.polyline(latlngs, {color: 'blue', dashArray: "4 1", opacity: 0.5}).addTo(map);
+    })
+
+    setTimeout(function () {
+        map.invalidateSize(true);
+        // zoom the map to the polyline
+        map.fitBounds(polyline.getBounds());
+    }, 100);
+</script>
+
+<style>
+    #map { height: 60dvh; }
+</style>
