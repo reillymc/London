@@ -51,14 +51,19 @@
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     })
 
-    window.matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change',({ matches }) => {
-  if (matches) {
-    tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png")
-  } else {
-    tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png")
-  }
-})
+    const setMapBaseColor = ({matches}) => {
+        if (matches) {
+            tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png")
+        } else {
+            tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png")
+        }
+    }
+
+    const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
+
+    darkMode.addEventListener('change',setMapBaseColor);
+
+    setMapBaseColor(darkMode);
 
     const locationRegex = /\[(.*?)\]/g;
 
@@ -114,10 +119,14 @@
     setTimeout(function () {
         map.invalidateSize(true);
         // zoom the map to the polyline
-        map.fitBounds(polyline.getBounds());
+        map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
     }, 100);
 </script>
 
 <style>
     #map { height: 60dvh; }
+
+    .leaflet-container {
+        background: var(--color-background);
+    }
 </style>

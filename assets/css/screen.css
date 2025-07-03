@@ -105,7 +105,7 @@ body {
 /* Site Navigation
 /* ---------------------------------------------------------- */
 .gh-head {
-    background-color: var(--color-background);
+    background-color: var(--color-background) !important;
 }
 
 .gh-head-logo {
@@ -118,6 +118,10 @@ body {
 .gh-head-actions {
     font-size: 1.4rem;
     font-weight: 600;
+}
+
+.is-head-open #gh-head .gh-head-actions {
+    background-color: var(--color-background) !important;
 }
 
 @media (max-width: 850px) {
@@ -321,6 +325,11 @@ body {
     flex-direction: row;
     justify-content: space-between;
     grid-column: wide;
+    gap: 32px;
+}
+
+.post-content-footer a {
+    text-align: center;
 }
 
 .post-content-comments {
