@@ -7,6 +7,11 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""></script>
 
+<link rel="stylesheet" src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"
+    crossorigin=""></link>
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"
+    crossorigin=""></script>
+
 {{#post}}
 <article class="post-content {{post_class}}">
 
@@ -30,15 +35,33 @@
             <div id="post-item">
                 <div id="post-item-title">
                     {{title}}
-                <div id="post-item-date">
-                    {{date format='YYYY-MM-DD'}}
                 </div>
+                <div id="post-item-date">
+                    {{published_at}}
                 </div>
                 <div id="post-item-excerpt">
                     {{excerpt}}
                 </div>
+                <div id="post-item-url">
+                    {{url}}
+                </div>
                 <div id="post-item-tags">
                     {{tags visibility="internal" autolink="false"}}
+                </div>
+            </div>
+        {{/foreach}}
+    {{/get}}
+</div>
+
+<div id="trip-tag-list" style="display: none;">
+    {{#get "tags" limit="all" }}
+        {{#foreach tags visibility="internal"}}
+            <div id="tag-item">
+                <div id="tag-name">
+                    {{name}}
+                </div>
+                <div id="tag-description">
+                    {{description}}
                 </div>
             </div>
         {{/foreach}}
@@ -71,6 +94,7 @@
     const postLocations = Array.from(document.getElementById("post-list")?.children ?? []).map(child => {
         const title = child.querySelector("#post-item-title")?.textContent?.trim();
         const date = child.querySelector("#post-item-date")?.textContent?.trim();
+        const url = child.querySelector("#post-item-url")?.textContent?.trim();
         const location = child.querySelector("#post-item-excerpt")?.textContent?.match(locationRegex)?.[0]?.replace("[", "")?.replace("]", "")?.split(",");
         const tripId = child.querySelector("#post-item-tags").childNodes[0].textContent.trim().split(", ").filter(tag => tag.startsWith("#Trip-"))
         
@@ -84,20 +108,74 @@
             date: new Date(date).getTime(),
             latitude: Number.parseFloat(location[0]),
             longitude: Number.parseFloat(location[1]),
-            tripId
+            tripId,
+            url,
         };
     }).filter(post => !!post)
+
+    const nonPostLocations = Array.from(document.getElementById("trip-tag-list")?.children ?? []).map(child => {
+        const tripId = child.querySelector("#tag-name")?.textContent?.trim();
+
+        const locationArray = child.querySelector("#tag-description")?.textContent?.trim().split("\n")
+
+        if (!locationArray) return;
+
+        const extraLocations = locationArray.map(extraLocation => {
+            const [title,date,locationRaw] = extraLocation.split(";")
+            const location = locationRaw?.match(locationRegex)?.[0]?.replace("[", "")?.replace("]", "")?.split(",");
+
+            if (location?.length !== 2 || !title || !tripId || !date) {
+                console.debug(`${title ?? "Untitled"} additional location has incomplete metadata`);
+                return;
+            }
+
+            return {
+                title,
+                date: new Date(date).getTime(),
+                latitude: Number.parseFloat(location[0]),
+                longitude: Number.parseFloat(location[1]),
+                tripId,
+            }
+        })
+
+        return extraLocations
+
+    }).flat().filter(location => !!location)
 
     var map = L.map('map');
     
     tileLayer.addTo(map);
 
+    var cluster = L.markerClusterGroup({
+        showCoverageOnHover: false,
+        maxClusterRadius: 20,
+    });
+
     postLocations.forEach(postLocation => {
-        var marker = L.marker([postLocation.latitude, postLocation.longitude]).addTo(map);
-        marker.bindPopup(`<h2>${postLocation.title}</h2>`);
+        var marker = L.marker([postLocation.latitude, postLocation.longitude])
+        cluster.addLayer(marker);
+
+        marker.bindPopup(`
+            <div>
+                <h2>${postLocation.title}</h2>
+                <a href=${postLocation.url}>View Post ></a>
+            </div>
+        `);
     })
 
-    const tripLineLocations = postLocations.reduce((acc, postLocation) => {
+    nonPostLocations.forEach(nonPostLocation => {
+        var marker = L.marker([nonPostLocation.latitude, nonPostLocation.longitude], { opacity: 0.5 })
+        cluster.addLayer(marker);
+
+        marker.bindPopup(`<h2>${nonPostLocation.title}</h2>`);
+    })
+
+    map.addLayer(cluster);
+
+
+    const combinedLocations = [...postLocations, ...nonPostLocations].sort((a, b) => a.date > b.date)
+
+    const tripLineLocations = combinedLocations.reduce((acc, postLocation) => {
         return {
             ...acc,
             [postLocation.tripId]: {
@@ -129,4 +207,31 @@
     .leaflet-container {
         background: var(--color-background);
     }
+
+    .leaflet-popup-content a {      
+        font-size: small;
+    }
+
+    .marker-cluster {
+        background-clip: padding-box;
+        border-radius: 20px;
+        background-color: rgba(140, 180, 226, 0.6);
+    }
+
+    .marker-cluster div {
+        background-color: rgba(113, 149, 202, 0.6);
+    }
+    .marker-cluster div {
+        width: 30px;
+        height: 30px;
+        margin-left: 5px;
+        margin-top: 5px;
+
+        text-align: center;
+        border-radius: 15px;
+        font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+    }
+    .marker-cluster span {
+        line-height: 30px;
+	}   
 </style>
