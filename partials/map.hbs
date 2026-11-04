@@ -1,0 +1,414 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"
+    crossorigin=""/>
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"
+    crossorigin=""></script>
+
+<div id="map" role="application" aria-label="Interactive map"></div>
+
+{{#post}}
+<aside class="map-panel" aria-label="Map details">
+    <div class="map-panel-inner">
+        <header class="map-panel-header">
+            <h1 class="map-panel-title">{{title}}</h1>
+        </header>
+
+        <div class="map-panel-content gh-content">
+            {{content}}
+        </div>
+
+        <nav class="map-panel-index" aria-label="Map index" hidden>
+            <h2 class="map-panel-index-title" id="map-index-title">Index</h2>
+            <ul id="map-index" class="map-panel-index-list"></ul>
+        </nav>
+    </div>
+</aside>
+{{/post}}
+
+<style>
+    :root {
+        --map-panel-width: clamp(300px, 32vw, 400px);
+        --map-panel-bottom-height: min(50dvh, 440px);
+    }
+
+    .site-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .site-main {
+        flex: 1;
+    }
+
+    #gh-head {
+        position: relative;
+        z-index: 3;
+    }
+
+    #map {
+        position: fixed !important;
+        top: 100px;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: auto;
+        z-index: 0;
+    }
+
+    .map-panel {
+        position: fixed;
+        top: 100px;
+        right: 0;
+        bottom: 0;
+        z-index: 2;
+        width: var(--map-panel-width);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        background: var(--color-background);
+        border-left: 1px solid var(--color-border);
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .map-panel-inner {
+        padding: max(2.4rem, 4vw);
+    }
+
+    .map-panel-title {
+        margin: 0 0 1.6rem;
+        font-size: clamp(2.4rem, 3vw, 3.6rem);
+        font-weight: 800;
+        line-height: 1.1;
+        color: var(--color-base);
+        word-break: break-word;
+    }
+
+    .has-serif-title:not([class*=" gh-font-heading"]):not([class^="gh-font-heading"]) .map-panel-title {
+        font-family: var(--gh-font-heading, var(--font-serif));
+    }
+
+    .map-panel-content.gh-content {
+        margin-top: 0;
+        font-size: 1.6rem;
+    }
+
+    .map-panel-content img {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .map-panel-index {
+        padding-top: 2.4rem;
+        margin-top: 3.2rem;
+        border-top: 1px solid var(--color-border);
+    }
+
+    .map-panel-index-title {
+        margin: 0 0 1.2rem;
+        font-size: 1.4rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-base);
+        opacity: 0.6;
+    }
+
+    .map-panel-index-list {
+        padding: 0;
+        margin: 0;
+        list-style: none;
+    }
+
+    .map-panel-index-item {
+        display: block;
+        width: 100%;
+        padding: 0.8rem 0;
+        font: inherit;
+        color: var(--color-base);
+        text-align: left;
+        cursor: pointer;
+        background: none;
+        border: 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .map-panel-index-item:hover,
+    .map-panel-index-item:focus-visible {
+        color: var(--color-primary);
+        outline: none;
+    }
+
+    .map-panel-index-item.is-active {
+        font-weight: 700;
+        color: var(--color-primary);
+    }
+
+    .map-panel-index-item.is-disabled {
+        cursor: default;
+        opacity: 0.4;
+    }
+
+    .gh-foot {
+        position: fixed;
+        right: var(--map-panel-width);
+        bottom: 0;
+        left: 0;
+        z-index: 2;
+        padding: 1.6rem var(--gap);
+        pointer-events: none;
+        text-shadow: 0 1px 3px var(--color-background), 0 0 12px var(--color-background);
+    }
+
+    .gh-foot a,
+    .gh-foot button {
+        pointer-events: auto;
+    }
+
+    @media (max-width: 767px) {
+        #map {
+            top: 64px;
+        }
+
+        .map-panel {
+            top: auto;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            width: auto;
+            height: var(--map-panel-bottom-height);
+            border-top: 1px solid var(--color-border);
+            border-left: 0;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .map-panel-inner {
+            padding: 2rem var(--gap) calc(2rem + env(safe-area-inset-bottom));
+        }
+
+        .gh-foot {
+            right: 0;
+            bottom: var(--map-panel-bottom-height);
+            padding: 1rem var(--gap);
+        }
+
+        .gh-foot-menu,
+        .gh-powered-by {
+            display: none;
+        }
+    }
+
+    .leaflet-container {
+        background: var(--color-background);
+    }
+
+    .leaflet-popup-content a {
+        font-size: small;
+    }
+
+    .marker-cluster {
+        background-clip: padding-box;
+        border-radius: 20px;
+        background-color: rgba(140, 180, 226, 0.6);
+    }
+
+    .marker-cluster div {
+        background-color: rgba(113, 149, 202, 0.6);
+    }
+    .marker-cluster div {
+        width: 30px;
+        height: 30px;
+        margin-left: 5px;
+        margin-top: 5px;
+
+        text-align: center;
+        border-radius: 15px;
+        font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+    }
+    .marker-cluster span {
+        line-height: 30px;
+	}
+</style>
+
+<script>
+    (function () {
+        const mapData = window.mapData ?? { targets: [], locations: [] };
+        const indexLabel = mapData.indexLabel || "Index";
+        const lineStyle = { color: "blue", dashArray: "4 1", opacity: 0.5, weight: 3 };
+        const selectedLineStyle = { ...lineStyle, opacity: 1, weight: 5 };
+
+        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, character => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            "\"": "&quot;",
+            "'": "&#39;",
+        })[character]);
+
+        const tileLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_520j_1_9a99661e0cf1de5d4a092737", {
+            maxZoom: 19,
+            attribution: "&copy; <a href=\"http://www.openstreetmap.org/copyright\">OpenStreetMap</a>"
+        });
+
+        const setMapBaseColor = ({ matches }) => {
+            if (matches) {
+                tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_520j_1_9a99661e0cf1de5d4a092737");
+            } else {
+                tileLayer.setUrl("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_520j_1_9a99661e0cf1de5d4a092737");
+            }
+        };
+
+        const darkMode = window.matchMedia("(prefers-color-scheme: dark)");
+
+        darkMode.addEventListener("change", setMapBaseColor);
+        setMapBaseColor(darkMode);
+
+        const map = L.map("map");
+        const cluster = L.markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 20,
+        });
+
+        tileLayer.addTo(map);
+
+        mapData.locations.forEach(location => {
+            const markerOptions = typeof location.opacity === "number" ? { opacity: location.opacity } : {};
+            const marker = L.marker([location.latitude, location.longitude], markerOptions);
+            const popup = location.url
+                ? `<div><h2>${escapeHtml(location.title)}</h2><a href="${escapeHtml(location.url)}">View Post ></a></div>`
+                : `<h2>${escapeHtml(location.title)}</h2>`;
+
+            cluster.addLayer(marker);
+            marker.bindPopup(popup);
+        });
+
+        map.addLayer(cluster);
+
+        const targetGroups = new Map();
+        const ensureTargetGroup = (targetId) => {
+            if (!targetGroups.has(targetId)) {
+                targetGroups.set(targetId, { id: targetId, label: targetId, locations: [] });
+            }
+
+            return targetGroups.get(targetId);
+        };
+
+        mapData.targets.forEach(target => {
+            const group = ensureTargetGroup(target.id);
+
+            if (target.label) {
+                group.label = target.label;
+            }
+        });
+
+        mapData.locations.forEach(location => {
+            (location.targetIds ?? []).forEach(targetId => {
+                ensureTargetGroup(targetId).locations.push(location);
+            });
+        });
+
+        const groupedTargets = Array.from(targetGroups.values()).map(target => {
+            const locations = target.locations.slice().sort((a, b) => a.date - b.date);
+
+            return {
+                ...target,
+                locations,
+                lastStopDate: locations.reduce((latest, location) => Math.max(latest, location.date || 0), 0),
+            };
+        });
+
+        const indexTargets = groupedTargets.slice().sort((a, b) => a.label.localeCompare(b.label));
+        const mostRecentTarget = groupedTargets.reduce((latest, target) => {
+            if (!latest || target.lastStopDate > latest.lastStopDate) return target;
+            return latest;
+        }, null);
+
+        const targetLayers = new Map();
+
+        groupedTargets.forEach(target => {
+            if (!target.locations.length) return;
+
+            const latlngs = target.locations.map(({ latitude, longitude }) => [latitude, longitude]);
+
+            targetLayers.set(target.id, L.polyline(latlngs, lineStyle).addTo(map));
+        });
+
+        const getFitPadding = () => {
+            const panel = document.querySelector(".map-panel");
+
+            if (!panel) return { padding: [50, 50] };
+
+            const { width, height } = panel.getBoundingClientRect();
+            const isBottomSheet = window.matchMedia("(max-width: 767px)").matches;
+
+            return isBottomSheet
+                ? { paddingTopLeft: [20, 20], paddingBottomRight: [20, height + 20] }
+                : { paddingTopLeft: [20, 20], paddingBottomRight: [width + 20, 20] };
+        };
+
+        const focusTarget = (targetId, button) => {
+            const line = targetLayers.get(targetId);
+
+            if (!line) return;
+
+            targetLayers.forEach(targetLine => targetLine.setStyle(lineStyle));
+            line.setStyle(selectedLineStyle);
+            line.bringToFront();
+
+            document.querySelectorAll(".map-panel-index-item").forEach(indexItem => {
+                indexItem.classList.toggle("is-active", indexItem === button);
+            });
+
+            map.fitBounds(line.getBounds(), { ...getFitPadding(), maxZoom: 10 });
+        };
+
+        const indexNav = document.querySelector(".map-panel-index");
+        const indexTitle = document.getElementById("map-index-title");
+        const indexList = document.getElementById("map-index");
+
+        if (indexNav && indexTitle && indexList && indexTargets.length) {
+            indexTitle.textContent = indexLabel;
+            indexNav.setAttribute("aria-label", indexLabel);
+
+            indexTargets.forEach(target => {
+                const listItem = document.createElement("li");
+                const button = document.createElement("button");
+
+                button.type = "button";
+                button.className = "map-panel-index-item";
+                button.dataset.targetId = target.id;
+                button.textContent = target.label;
+
+                if (targetLayers.has(target.id)) {
+                    button.addEventListener("click", () => focusTarget(target.id, button));
+                } else {
+                    button.classList.add("is-disabled");
+                    button.disabled = true;
+                }
+
+                listItem.appendChild(button);
+                indexList.appendChild(listItem);
+            });
+
+            indexNav.hidden = false;
+        }
+
+        setTimeout(function () {
+            map.invalidateSize(true);
+
+            const mostRecentLayer = mostRecentTarget ? targetLayers.get(mostRecentTarget.id) : null;
+
+            if (mostRecentLayer) {
+                map.fitBounds(mostRecentLayer.getBounds(), { ...getFitPadding(), maxZoom: 10 });
+            } else if (cluster.getLayers().length) {
+                map.fitBounds(cluster.getBounds(), { ...getFitPadding(), maxZoom: 10 });
+            }
+        }, 100);
+    })();
+</script>

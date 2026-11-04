@@ -1,0 +1,155 @@
+{{!< default}}
+
+<div id="journey-post-list" style="display: none;">
+    {{#get "posts" limit="all" include="excerpt,tags"}}
+        {{#foreach posts}}
+            <div id="post-item">
+                <div id="post-item-title">
+                    {{title}}
+                </div>
+                <div id="post-item-date">
+                    {{published_at}}
+                </div>
+                <div id="post-item-excerpt">
+                    {{excerpt}}
+                </div>
+                <div id="post-item-url">
+                    {{url}}
+                </div>
+                <div id="post-item-tags">
+                    {{tags visibility="internal" autolink="false"}}
+                </div>
+            </div>
+        {{/foreach}}
+    {{/get}}
+</div>
+
+<div id="journey-tag-list" style="display: none;">
+    {{#get "tags" limit="all" }}
+        {{#foreach tags visibility="internal"}}
+            <div id="tag-item">
+                <div id="tag-name">
+                    {{name}}
+                </div>
+                <div id="tag-description">
+                    {{description}}
+                </div>
+            </div>
+        {{/foreach}}
+    {{/get}}
+</div>
+
+<script>
+    (function () {
+        const targetPrefix = "#Trip-";
+        const locationRegex = /\[(.*?)\]/g;
+
+        const parseLocation = (raw) => {
+            const match = raw?.match(locationRegex)?.[0];
+            if (!match) return;
+
+            const location = match.replace("[", "").replace("]", "").split(",");
+            if (location.length !== 2) return;
+
+            const latitude = Number.parseFloat(location[0]);
+            const longitude = Number.parseFloat(location[1]);
+
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+            return { latitude, longitude };
+        };
+
+        const getTargetName = (child) => child.querySelector("#tag-name")?.textContent?.trim();
+        const tagListChildren = Array.from(document.getElementById("journey-tag-list")?.children ?? []);
+        const targets = new Map();
+
+        tagListChildren.forEach(child => {
+            const targetName = getTargetName(child);
+
+            if (targetName?.startsWith(targetPrefix)) {
+                targets.set(targetName, { id: targetName, label: targetName });
+            }
+        });
+
+        const locations = [];
+
+        Array.from(document.getElementById("journey-post-list")?.children ?? []).forEach(child => {
+            const title = child.querySelector("#post-item-title")?.textContent?.trim();
+            const date = child.querySelector("#post-item-date")?.textContent?.trim();
+            const url = child.querySelector("#post-item-url")?.textContent?.trim();
+            const coordinates = parseLocation(child.querySelector("#post-item-excerpt")?.textContent);
+            const targetIds = child.querySelector("#post-item-tags")?.childNodes[0]?.textContent.trim().split(", ").filter(tag => tag.startsWith(targetPrefix)) ?? [];
+
+            if (!coordinates || !title || !targetIds.length || !date) {
+                console.debug(`${title ?? "Untitled"} has incomplete metadata`);
+                return;
+            }
+
+            const timestamp = new Date(date).getTime();
+
+            if (Number.isNaN(timestamp)) {
+                console.debug(`${title} has an invalid date`);
+                return;
+            }
+
+            targetIds.forEach(targetId => {
+                if (!targets.has(targetId)) {
+                    targets.set(targetId, { id: targetId, label: targetId });
+                }
+            });
+
+            locations.push({
+                title,
+                date: timestamp,
+                latitude: coordinates.latitude,
+                longitude: coordinates.longitude,
+                targetIds,
+                url,
+                opacity: 1,
+            });
+        });
+
+        tagListChildren.forEach(child => {
+            const targetId = getTargetName(child);
+            const description = child.querySelector("#tag-description")?.textContent?.trim();
+
+            if (!targetId?.startsWith(targetPrefix) || !description) return;
+
+            description.split(/\r?\n/).forEach(line => {
+                if (!line.trim()) return;
+
+                const [title, date, locationRaw] = line.split(";");
+                const coordinates = parseLocation(locationRaw);
+
+                if (!coordinates || !title || !date) {
+                    console.debug(`${title ?? "Untitled"} additional location has incomplete metadata`);
+                    return;
+                }
+
+                const timestamp = new Date(date).getTime();
+
+                if (Number.isNaN(timestamp)) {
+                    console.debug(`${title} additional location has an invalid date`);
+                    return;
+                }
+
+                locations.push({
+                    title,
+                    date: timestamp,
+                    latitude: coordinates.latitude,
+                    longitude: coordinates.longitude,
+                    targetIds: [targetId],
+                    opacity: 0.5,
+                });
+            });
+        });
+
+        window.mapData = {
+            indexLabel: "Trips",
+            targets: Array.from(targets.values()),
+            locations,
+        };
+    })();
+</script>
+
+{{> "map"}}
