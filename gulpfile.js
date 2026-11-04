@@ -90,12 +90,17 @@ function zipper(done) {
     ], handleError(done));
 }
 
+const build = series(css, js);
 const hbsWatcher = () => watch(['*.hbs', 'partials/**/*.hbs'], hbs);
 const cssWatcher = () => watch('assets/css/**/*.css', css);
 const jsWatcher = () => watch('assets/js/**/*.js', js);
+const zipWatcher = () => watch(
+    ['*.hbs', 'partials/**/*.hbs', 'assets/**/*', '!assets/built/**', 'package.json'],
+    series(build, zipper)
+);
 const watcher = parallel(hbsWatcher, cssWatcher, jsWatcher);
-const build = series(css, js);
 
 exports.build = build;
 exports.zip = series(build, zipper);
+exports.watchZip = series(build, zipper, zipWatcher);
 exports.default = series(build, serve, watcher);

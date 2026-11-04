@@ -81,7 +81,8 @@
     "scripts": {
         "dev": "gulp",
         "test": "gscan .",
-        "zip": "gulp zip"
+        "zip": "gulp zip",
+        "watch:zip": "gulp watchZip"
     },
     "devDependencies": {
         "@tryghost/shared-theme-assets": "2.5.0",
