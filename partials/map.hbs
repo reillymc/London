@@ -240,8 +240,16 @@
     (function () {
         const mapData = window.mapData ?? { targets: [], locations: [] };
         const indexLabel = mapData.indexLabel || "Index";
-        const lineStyle = { color: "blue", dashArray: "4 1", opacity: 0.5, weight: 3 };
+        const lineStyle = { color: "blue", dashArray: "8 6", opacity: 0.8, weight: 3 };
         const selectedLineStyle = { ...lineStyle, opacity: 1, weight: 5 };
+        const lineHitStyle = {
+            color: lineStyle.color,
+            opacity: 0.001,
+            weight: 20,
+            lineCap: "round",
+            lineJoin: "round",
+            bubblingMouseEvents: false,
+        };
 
         const escapeHtml = (value) => String(value).replace(/[&<>"']/g, character => ({
             "&": "&amp;",
@@ -286,6 +294,11 @@
 
             cluster.addLayer(marker);
             marker.bindPopup(popup);
+            marker.on("click", () => {
+                const targetId = location.targetIds?.[0];
+
+                if (targetId) selectTarget(targetId, { fit: false });
+            });
         });
 
         map.addLayer(cluster);
@@ -330,13 +343,25 @@
         }, null);
 
         const targetLayers = new Map();
+        const targetButtons = new Map();
 
         groupedTargets.forEach(target => {
             if (!target.locations.length) return;
 
             const latlngs = target.locations.map(({ latitude, longitude }) => [latitude, longitude]);
+            const hitLine = L.polyline(latlngs, lineHitStyle).addTo(map);
 
-            targetLayers.set(target.id, L.polyline(latlngs, lineStyle).addTo(map));
+            hitLine.on("click", () => selectTarget(target.id));
+            map.whenReady(() => hitLine.bringToBack());
+
+            const line = L.polyline(latlngs, {
+                ...lineStyle,
+                bubblingMouseEvents: false,
+            }).addTo(map);
+
+            line.on("click", () => selectTarget(target.id));
+
+            targetLayers.set(target.id, line);
         });
 
         const getFitPadding = () => {
@@ -352,7 +377,7 @@
                 : { paddingTopLeft: [20, 20], paddingBottomRight: [width + 20, 20] };
         };
 
-        const focusTarget = (targetId, button) => {
+        const selectTarget = (targetId, { fit = true } = {}) => {
             const line = targetLayers.get(targetId);
 
             if (!line) return;
@@ -361,11 +386,15 @@
             line.setStyle(selectedLineStyle);
             line.bringToFront();
 
-            document.querySelectorAll(".map-panel-index-item").forEach(indexItem => {
-                indexItem.classList.toggle("is-active", indexItem === button);
+            targetButtons.forEach((button, id) => {
+                button.classList.toggle("is-active", id === targetId);
             });
 
-            map.fitBounds(line.getBounds(), { ...getFitPadding(), maxZoom: 10 });
+            targetButtons.get(targetId)?.scrollIntoView({ block: "nearest" });
+
+            if (fit) {
+                map.fitBounds(line.getBounds(), { ...getFitPadding(), maxZoom: 10 });
+            }
         };
 
         const indexNav = document.querySelector(".map-panel-index");
@@ -386,7 +415,8 @@
                 button.textContent = target.label;
 
                 if (targetLayers.has(target.id)) {
-                    button.addEventListener("click", () => focusTarget(target.id, button));
+                    targetButtons.set(target.id, button);
+                    button.addEventListener("click", () => selectTarget(target.id));
                 } else {
                     button.classList.add("is-disabled");
                     button.disabled = true;
