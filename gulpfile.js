@@ -39,7 +39,10 @@ function hbs(done) {
 
 function css(done) {
     pump([
-        src('assets/css/screen.css', {sourcemaps: true}),
+        src([
+            'assets/css/screen.css',
+            'assets/css/journey-map.css'
+        ], {sourcemaps: true}),
         postcss([
             easyimport,
             autoprefixer(),
@@ -65,15 +68,30 @@ function getJsFiles(version) {
     return jsFiles;
 }
 
-function js(done) {
-    pump([
-        order(getJsFiles('v1'), {sourcemaps: true}),
-        concat('main.min.js'),
-        uglify(),
-        dest('assets/built/', {sourcemaps: '.'}),
-        livereload()
-    ], handleError(done));
+function compileJs(getStream, filename) {
+    return function (done) {
+        pump([
+            getStream(),
+            concat(filename),
+            uglify(),
+            dest('assets/built/', {sourcemaps: '.'}),
+            livereload()
+        ], handleError(done));
+    };
 }
+
+const js = compileJs(
+    () => order(getJsFiles('v1'), {sourcemaps: true}),
+    'main.min.js'
+);
+
+const journeyMapJs = compileJs(
+    () => src('assets/js/journey-map.js', {sourcemaps: true}),
+    'journey-map.js'
+);
+
+js.displayName = 'js';
+journeyMapJs.displayName = 'journeyMapJs';
 
 function zipper(done) {
     const filename = require('./package.json').name + '.zip';
@@ -90,10 +108,10 @@ function zipper(done) {
     ], handleError(done));
 }
 
-const build = series(css, js);
+const build = series(css, parallel(js, journeyMapJs));
 const hbsWatcher = () => watch(['*.hbs', 'partials/**/*.hbs'], hbs);
 const cssWatcher = () => watch('assets/css/**/*.css', css);
-const jsWatcher = () => watch('assets/js/**/*.js', js);
+const jsWatcher = () => watch('assets/js/**/*.js', parallel(js, journeyMapJs));
 const zipWatcher = () => watch(
     ['*.hbs', 'partials/**/*.hbs', 'assets/**/*', '!assets/built/**', 'package.json'],
     series(build, zipper)

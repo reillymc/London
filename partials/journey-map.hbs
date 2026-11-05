@@ -1,0 +1,17 @@
+<div id="map" role="region" aria-label="Interactive map"
+    data-tile-url-light="{{@custom.map_tile_url_light}}"
+    data-tile-url-dark="{{@custom.map_tile_url_dark}}"
+    data-tile-attribution="{{@custom.map_tile_attribution}}"></div>
+
+<template id="journey-map-popup-template">
+    <div class="gh-content map-popup">
+        <img class="map-popup-image" alt="" loading="lazy">
+        <span class="map-popup-gradient"></span>
+        <div class="map-popup-nav" role="group" aria-label="Navigate trip points" hidden>
+            <button type="button" class="map-popup-left" aria-label="Next point"></button>
+            <span class="map-popup-position" aria-live="polite"></span>
+            <button type="button" class="map-popup-right" aria-label="Previous point"></button>
+        </div>
+        <h3 class="map-popup-title"></h3>
+    </div>
+</template>

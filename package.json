@@ -75,11 +75,27 @@
                     "Elegant serif"
                 ],
                 "default": "Modern sans-serif"
+            },
+            "map_tile_url_light": {
+                "type": "text",
+                "default": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_520j_1_9a99661e0cf1de5d4a092737",
+                "description": "Light map tile URL. The default uses CARTO."
+            },
+            "map_tile_url_dark": {
+                "type": "text",
+                "default": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_520j_1_9a99661e0cf1de5d4a092737",
+                "description": "Dark map tile URL. The default uses CARTO."
+            },
+            "map_tile_attribution": {
+                "type": "text",
+                "default": "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors © <a href='https://carto.com/attributions'>CARTO</a>",
+                "description": "Attribution HTML shown on the map."
             }
         }
     },
     "scripts": {
         "dev": "gulp",
+        "build": "gulp build",
         "test": "gscan .",
         "zip": "gulp zip",
         "watch:zip": "gulp watchZip"
