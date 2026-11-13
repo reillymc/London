@@ -321,12 +321,12 @@
 
         leftButton.addEventListener("click", event => {
             event.stopPropagation();
-            navigatePopup(location, 1);
+            navigatePopup(location, -1);
         });
 
         rightButton.addEventListener("click", event => {
             event.stopPropagation();
-            navigatePopup(location, -1);
+            navigatePopup(location, 1);
         });
 
         return popupEl;
@@ -554,23 +554,16 @@
 
     const updatePopupNav = (location, popupEl) => {
         const nav = popupEl.querySelector(".map-popup-nav");
-        const position = popupEl.querySelector(".map-popup-position");
         const leftButton = popupEl.querySelector(".map-popup-left");
         const rightButton = popupEl.querySelector(".map-popup-right");
 
         if (!nav || !leftButton || !rightButton) return;
 
-        const { target, index, isNavigable, hasPrev, hasNext } = getNavigationState(location);
+        const { isNavigable, hasPrev, hasNext } = getNavigationState(location);
 
         nav.hidden = !isNavigable;
-        leftButton.disabled = !hasNext;
-        rightButton.disabled = !hasPrev;
-
-        if (position) {
-            position.textContent = isNavigable
-                ? `${index + 1} / ${target.locations.length}`
-                : "";
-        }
+        leftButton.disabled = !hasPrev;
+        rightButton.disabled = !hasNext;
     };
 
     const navigatePopup = (location, direction) => {

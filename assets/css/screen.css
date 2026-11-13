@@ -332,6 +332,37 @@ body {
     text-align: center;
 }
 
+.post-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.post-nav-link::before,
+.post-nav-link::after {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 14px;
+    background-color: currentColor;
+    -webkit-mask-image: url("../images/default-skin.svg");
+    mask-image: url("../images/default-skin.svg");
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 264px 88px;
+    mask-size: 264px 88px;
+}
+
+.post-nav-prev::before {
+    -webkit-mask-position: -147px -53px;
+    mask-position: -147px -53px;
+}
+
+.post-nav-next::after {
+    -webkit-mask-position: -103px -53px;
+    mask-position: -103px -53px;
+}
+
 .post-content-comments {
     margin-top: 64px;
 }

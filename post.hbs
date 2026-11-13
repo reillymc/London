@@ -16,11 +16,11 @@
         {{content}}
         <div class="post-content-footer">
             {{#prev_post}}
-                <a href="{{url}}">< {{title}}</a>
+                <a class="post-nav-link post-nav-prev" href="{{url}}">{{title}}</a>
             {{/prev_post}}
 
             {{#next_post}}
-                <a href="{{url}}">{{title}} ></a>
+                <a class="post-nav-link post-nav-next" href="{{url}}">{{title}}</a>
             {{/next_post}}
         </div>
     </div>
