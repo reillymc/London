@@ -37,112 +37,192 @@
         return { latitude, longitude };
     };
 
-    const buildMapData = () => {
-        const targets = new Map();
-        const indexItems = new Map();
+    const asString = value => (typeof value === "string" ? value.trim() : "");
+    const asOptionalString = value => asString(value) || null;
+    const toTimestamp = value => {
+        const timestamp = Date.parse(value);
+
+        return Number.isNaN(timestamp) ? null : timestamp;
+    };
+    const ensureTarget = (targets, id) => {
+        if (!targets.has(id)) {
+            targets.set(id, {
+                id,
+                color: null,
+                description: "",
+                count: null,
+                locations: [],
+            });
+        }
+
+        return targets.get(id);
+    };
+
+    const normalizeTarget = target => {
+        const id = asString(target?.id);
+
+        if (!id.startsWith(TRIP_PREFIX)) return null;
+
+        const count = Number(target.count);
+
+        return {
+            id,
+            color: asOptionalString(target.color),
+            description: asString(target.description),
+            count: Number.isFinite(count) ? count : null,
+            locations: [],
+        };
+    };
+
+    const normalizeLocation = postData => {
+        const title = asString(postData?.title);
+        const date = asString(postData?.date);
+        const coordinates = parseLocation(postData?.excerpt);
+        const timestamp = toTimestamp(date);
+
+        if (!coordinates || !title || timestamp === null) return null;
+
+        return {
+            title,
+            date: timestamp,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            targetIds: Array.isArray(postData.targetIds)
+                ? postData.targetIds.map(asString).filter(id => id.startsWith(TRIP_PREFIX))
+                : [],
+            color: null,
+            url: asOptionalString(postData.url),
+            image: asOptionalString(postData.image),
+            imageAlt: asOptionalString(postData.imageAlt),
+            opacity: 1,
+        };
+    };
+
+    const normalizeStop = (target, line) => {
+        const trimmed = line.trim();
+
+        if (!trimmed) return null;
+
+        const [rawTitle, rawDate, rawLocation] = trimmed.split(";");
+        const title = rawTitle?.trim();
+        const date = rawDate?.trim();
+        const coordinates = parseLocation(rawLocation);
+        const timestamp = toTimestamp(date);
+
+        if (!coordinates || !title || timestamp === null) return null;
+
+        return {
+            title,
+            date: timestamp,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            targetIds: [target.id],
+            color: target.color,
+            url: null,
+            image: null,
+            imageAlt: null,
+            opacity: 0.5,
+        };
+    };
+
+    const readJsonScript = id => {
+        const el = document.getElementById(id);
+
+        if (!el) return null;
+
+        try {
+            return JSON.parse(el.textContent);
+        } catch (error) {
+            console.warn(`Journey map: could not parse #${id}`, error);
+            return null;
+        }
+    };
+
+    const buildMapData = data => {
+        const rawTargets = Array.isArray(data?.targets) ? data.targets : [];
+        const targets = new Map(
+            rawTargets.map(normalizeTarget).filter(Boolean).map(target => [target.id, target])
+        );
+        const locations = (Array.isArray(data?.locations) ? data.locations : [])
+            .map(normalizeLocation)
+            .filter(Boolean);
+
+        locations.forEach(location => {
+            location.targetIds.forEach(id => ensureTarget(targets, id));
+            location.color = targets.get(location.targetIds[0])?.color || null;
+            location.targetIds.forEach(id => targets.get(id)?.locations.push(location));
+        });
+
+        targets.forEach(target => {
+            if (!target.description) return;
+
+            target.description
+                .split(/\r?\n/)
+                .map(line => normalizeStop(target, line))
+                .filter(Boolean)
+                .forEach(location => {
+                    locations.push(location);
+                    target.locations.push(location);
+                });
+        });
+
+        targets.forEach(target => {
+            target.locations.sort((a, b) => a.date - b.date);
+            target.color = normalizeColor(target.color);
+        });
+
+        locations.forEach(location => {
+            location.color = normalizeColor(location.color);
+        });
+
+        return {
+            tiles: data?.tiles && typeof data.tiles === "object" ? data.tiles : {},
+            targets,
+            locations,
+        };
+    };
+
+    const collectIndexItems = () => {
+        const items = new Map();
 
         document.querySelectorAll(".journey-index-item").forEach(item => {
             const id = item.dataset.targetId?.trim();
 
             if (!id?.startsWith(TRIP_PREFIX)) return;
 
-            indexItems.set(id, item);
-            targets.set(id, {
-                id,
-                color: item.dataset.color?.trim() || null,
-                description: item.dataset.description?.trim() || "",
-            });
+            items.set(id, item);
         });
 
-        const locations = [];
-
-        document.querySelectorAll(".journey-post").forEach(postEl => {
-            const title = postEl.dataset.title?.trim();
-            const date = postEl.dataset.date?.trim();
-            const url = postEl.dataset.url?.trim() || null;
-            const image = postEl.dataset.image?.trim() || null;
-            const imageAlt = postEl.dataset.imageAlt?.trim() || null;
-            const coordinates = parseLocation(postEl.dataset.excerpt);
-            const targetIds = (postEl.dataset.targetIds?.trim() || "")
-                .split(/\s+/)
-                .filter(id => id.startsWith(TRIP_PREFIX));
-
-            if (!coordinates || !title || !date) return;
-
-            const timestamp = Date.parse(date);
-
-            if (Number.isNaN(timestamp)) return;
-
-            targetIds.forEach(id => {
-                if (!targets.has(id)) {
-                    targets.set(id, {
-                        id,
-                        color: null,
-                        description: "",
-                    });
-                }
-            });
-
-            locations.push({
-                title,
-                date: timestamp,
-                latitude: coordinates.latitude,
-                longitude: coordinates.longitude,
-                targetIds,
-                color: targets.get(targetIds[0])?.color || null,
-                url,
-                image,
-                imageAlt,
-                opacity: 1,
-            });
-        });
-
-        targets.forEach(target => {
-            if (!target.description) return;
-
-            target.description.split(/\r?\n/).forEach(line => {
-                const trimmed = line.trim();
-
-                if (!trimmed) return;
-
-                const [rawTitle, rawDate, rawLocation] = trimmed.split(";");
-                const title = rawTitle?.trim();
-                const date = rawDate?.trim();
-                const coordinates = parseLocation(rawLocation);
-
-                if (!coordinates || !title || !date) return;
-
-                const timestamp = Date.parse(date);
-
-                if (Number.isNaN(timestamp)) return;
-
-                locations.push({
-                    title,
-                    date: timestamp,
-                    latitude: coordinates.latitude,
-                    longitude: coordinates.longitude,
-                    targetIds: [target.id],
-                    color: target.color,
-                    url: null,
-                    image: null,
-                    imageAlt: null,
-                    opacity: 0.5,
-                });
-            });
-        });
-
-        return {
-            targets: Array.from(targets.values()).map(({ description, ...target }) => target),
-            locations,
-            indexItems,
-        };
+        return items;
     };
 
-    const mapData = buildMapData();
+    const enhanceSinglePostLinks = (targets, indexItems) => {
+        targets.forEach(target => {
+            if (target.count !== 1) return;
 
-    const tileUrlLight = mapEl.dataset.tileUrlLight?.trim() || DEFAULT_TILE_URL_LIGHT;
-    const tileUrlDark = mapEl.dataset.tileUrlDark?.trim() || DEFAULT_TILE_URL_DARK;
-    const attribution = mapEl.dataset.tileAttribution?.trim() || DEFAULT_ATTRIBUTION;
+            const location = target.locations.find(item => item.url);
+            const entry = indexItems.get(target.id)?.closest(".journey-index-entry");
+            const link = entry?.querySelector(".journey-index-link");
+
+            if (!location || !link) return;
+
+            link.href = location.url;
+            link.setAttribute("aria-label", `View ${location.title}`);
+        });
+    };
+
+    const data = readJsonScript("journey-map-data");
+
+    if (!data) return;
+
+    const { tiles, targets, locations } = buildMapData(data);
+    const indexItems = collectIndexItems();
+
+    enhanceSinglePostLinks(targets, indexItems);
+
+    const tileUrlLight = asOptionalString(tiles.light) || DEFAULT_TILE_URL_LIGHT;
+    const tileUrlDark = asOptionalString(tiles.dark) || DEFAULT_TILE_URL_DARK;
+    const attribution = asOptionalString(tiles.attribution) || DEFAULT_ATTRIBUTION;
     const tileLayer = L.tileLayer(tileUrlLight, { maxZoom: 19, attribution });
     const setMapBaseColor = ({ matches }) => tileLayer.setUrl(matches ? tileUrlDark : tileUrlLight);
     const darkMode = window.matchMedia("(prefers-color-scheme: dark)");
@@ -252,9 +332,9 @@
         return popupEl;
     };
 
-    mapData.locations.forEach(location => {
+    locations.forEach(location => {
         const marker = L.marker([location.latitude, location.longitude], {
-            icon: createLocationIcon(normalizeColor(location.color)),
+            icon: createLocationIcon(location.color),
             opacity: location.opacity,
             bubblingMouseEvents: false,
         });
@@ -283,20 +363,6 @@
         if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
     });
 
-    const targets = new Map(
-        mapData.targets.map(target => [target.id, { ...target, locations: [] }])
-    );
-
-    mapData.locations.forEach(location => {
-        location.targetIds.forEach(targetId => {
-            targets.get(targetId)?.locations.push(location);
-        });
-    });
-
-    targets.forEach(target => {
-        target.locations.sort((a, b) => a.date - b.date);
-    });
-
     const getLastStopDate = target =>
         target?.locations?.length
             ? target.locations[target.locations.length - 1].date
@@ -322,28 +388,25 @@
 
     const mostRecentTarget = Array.from(targets.values())
         .filter(target => target.locations.length)
-        .reduce((latest, target) => {
-            if (!latest) return target;
-
-            const latestLocation = latest.locations[latest.locations.length - 1];
-            const targetLocation = target.locations[target.locations.length - 1];
-
-            return targetLocation.date > latestLocation.date ? target : latest;
-        }, null);
+        .reduce(
+            (latest, target) =>
+                !latest || getLastStopDate(target) > getLastStopDate(latest)
+                    ? target
+                    : latest,
+            null
+        );
 
     targets.forEach(target => {
         if (!target.locations.length) return;
 
-        const color = normalizeColor(target.color);
         const latlngs = target.locations.map(({ latitude, longitude }) => [latitude, longitude]);
-        const hitLine = L.polyline(latlngs, { ...lineHitStyle, color }).addTo(map);
+        const hitLine = L.polyline(latlngs, { ...lineHitStyle, color: target.color }).addTo(map);
 
-        target.color = color;
         hitLine.on("click", () => selectTarget(target.id, { toggle: true }));
 
         const line = L.polyline(latlngs, {
             ...lineStyle,
-            color,
+            color: target.color,
             bubblingMouseEvents: false,
             className: "journey-trip-line",
         }).addTo(map);
@@ -382,7 +445,7 @@
             ? selectedTarget.locations[selectedTarget.locations.length - 1]
             : null;
 
-        mapData.locations.forEach(location => {
+        locations.forEach(location => {
             const isRelated = targetId && location.targetIds.includes(targetId);
             let endpoint = null;
 
@@ -391,9 +454,7 @@
                 if (location === lastLocation) endpoint = "end";
             }
 
-            location.marker.setIcon(
-                createLocationIcon(normalizeColor(location.color), endpoint)
-            );
+            location.marker.setIcon(createLocationIcon(location.color, endpoint));
             location.marker.setOpacity(
                 targetId && !isRelated ? DIMMED_MARKER_OPACITY : location.opacity
             );
@@ -402,16 +463,26 @@
         cluster.refreshClusters();
     };
 
+    const setIndexActive = targetId => {
+        indexItems.forEach((item, id) => {
+            const isActive = id === targetId;
+
+            item.classList.toggle("is-active", isActive);
+
+            if (isActive) {
+                item.setAttribute("aria-current", "true");
+            } else {
+                item.removeAttribute("aria-current");
+            }
+        });
+    };
+
     const clearTargetSelection = () => {
         if (!activeTargetId) return;
 
         activeTargetId = null;
         updateSelectionAppearance(null);
-
-        mapData.indexItems.forEach(item => {
-            item.classList.remove("is-active");
-            item.removeAttribute("aria-current");
-        });
+        setIndexActive(null);
     };
 
     const selectTarget = (targetId, { fit = true, toggle = false } = {}) => {
@@ -428,18 +499,7 @@
         suppressPopupClose();
         updateSelectionAppearance(targetId);
         line.bringToFront();
-
-        mapData.indexItems.forEach((item, id) => {
-            const isActive = id === targetId;
-
-            item.classList.toggle("is-active", isActive);
-
-            if (isActive) {
-                item.setAttribute("aria-current", "true");
-            } else {
-                item.removeAttribute("aria-current");
-            }
-        });
+        setIndexActive(targetId);
 
         if (fit) {
             map.flyToBounds(line.getBounds(), {
@@ -449,7 +509,7 @@
         }
     };
 
-    mapData.indexItems.forEach((item, id) => {
+    indexItems.forEach((item, id) => {
         if (!targets.get(id)?.line) {
             item.disabled = true;
             return;
